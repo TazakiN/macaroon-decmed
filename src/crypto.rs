@@ -74,6 +74,12 @@ impl From<[u8; KEY_BYTES]> for MacaroonKey {
     }
 }
 
+impl From<&[u8; KEY_BYTES]> for MacaroonKey {
+    fn from(bytes: &[u8; KEY_BYTES]) -> Self {
+        MacaroonKey(*bytes)
+    }
+}
+
 impl TryFrom<&[u8]> for MacaroonKey {
     type Error = MacaroonError;
 

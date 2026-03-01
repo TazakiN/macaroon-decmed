@@ -176,6 +176,7 @@ pub fn deserialize(data: &[u8]) -> Result<Macaroon> {
 #[cfg(test)]
 mod tests {
     use crate::{ByteString, Caveat, Macaroon, MacaroonKey};
+    use base64::{engine::general_purpose, Engine as _};
 
     #[test]
     fn test_deserialize() {
@@ -185,7 +186,7 @@ mod tests {
             40, 226, 169, 147, 1, 249, 215, 17, 198, 9, 227, 142, 247,
         ]
         .into();
-        let data = general_purpose::URL_SAFE.decode(serialized).unwrap();
+        let data = general_purpose::URL_SAFE_NO_PAD.decode(serialized).unwrap();
         let macaroon = super::deserialize(&data).unwrap();
         let macaroon_lib = Macaroon::deserialize(serialized).unwrap();
         assert_eq!(macaroon, macaroon_lib);
@@ -199,7 +200,7 @@ mod tests {
             61, 191, 115, 57, 186, 97, 118, 93, 164, 189, 37, 157, 135,
         ]
         .into();
-        let data = general_purpose::URL_SAFE.decode(serialized).unwrap();
+        let data = general_purpose::URL_SAFE_NO_PAD.decode(serialized).unwrap();
         let macaroon = super::deserialize(&data).unwrap();
         assert!(macaroon.location().is_some());
         assert_eq!("http://example.org/", &macaroon.location().unwrap());

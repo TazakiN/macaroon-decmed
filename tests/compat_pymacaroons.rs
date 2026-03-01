@@ -1,4 +1,4 @@
-use base64;
+use base64::{engine::general_purpose, Engine as _};
 /// https://github.com/ecordell/pymacaroons/blob/master/tests/functional_tests/functional_tests.py
 use macaroon::{Format, Macaroon, MacaroonError, MacaroonKey};
 
@@ -54,7 +54,7 @@ fn test_serializing() {
     mac.add_first_party_caveat("test = caveat".into());
     let b64_standard = "MDAxY2xvY2F0aW9uIGh0dHA6Ly9teWJhbmsvCjAwMjZpZGVudGlmaWVyIHdlIHVzZWQgb3VyIHNlY3JldCBrZXkKMDAxNmNpZCB0ZXN0ID0gY2F2ZWF0CjAwMmZzaWduYXR1cmUgGXusegRK8zMyhluSZuJtSTvdZopmDkTYjOGpmMI9vWcK";
     let b64_url_safe =
-        base64::encode_config(base64::decode(b64_standard).unwrap(), base64::URL_SAFE);
+        general_purpose::URL_SAFE.encode(general_purpose::STANDARD.decode(b64_standard).unwrap());
     assert_eq!(mac.serialize(Format::V1).unwrap(), b64_url_safe);
 
     let after_v1 = Macaroon::deserialize(mac.serialize(Format::V1).unwrap()).unwrap();
@@ -68,7 +68,7 @@ fn test_serializing() {
 #[test]
 fn test_serializing_binary_id() {
     let root_key = MacaroonKey::generate(b"this is our super secret key; only we should know it");
-    let identifier = base64::decode("AK2o+q0Aq9+bONkXw7ky7HAuhCLO9hhaMMc").unwrap();
+    let identifier = general_purpose::STANDARD_NO_PAD.decode("AK2o+q0Aq9+bONkXw7ky7HAuhCLO9hhaMMc").unwrap();
     let mut mac = Macaroon::create(
         Some("http://mybank/".into()),
         &root_key,

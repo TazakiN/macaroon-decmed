@@ -105,7 +105,7 @@ extern crate base64;
 extern crate serde;
 extern crate serde_json;
 
-use base64::{engine::general_purpose, Engine as _};
+use base64::{engine::{general_purpose, GeneralPurpose, GeneralPurposeConfig, DecodePaddingMode}, alphabet, Engine as _};
 
 mod caveat;
 mod crypto;
@@ -238,10 +238,14 @@ fn base64_decode_flexible(b: &[u8]) -> Result<Vec<u8>> {
             "empty token to deserialize".to_string(),
         ));
     }
+    let indifferent = GeneralPurposeConfig::new()
+        .with_decode_padding_mode(DecodePaddingMode::Indifferent);
     if b.contains(&b'_') || b.contains(&b'-') {
-        Ok(general_purpose::URL_SAFE.decode(b)?)
+        let engine = GeneralPurpose::new(&alphabet::URL_SAFE, indifferent);
+        Ok(engine.decode(b)?)
     } else {
-        Ok(general_purpose::STANDARD.decode(b)?)
+        let engine = GeneralPurpose::new(&alphabet::STANDARD, indifferent);
+        Ok(engine.decode(b)?)
     }
 }
 

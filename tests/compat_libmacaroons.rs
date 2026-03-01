@@ -1,7 +1,7 @@
 // Examples from libmacaroons reference implementation README:
 // https://github.com/rescrv/libmacaroons
 
-use base64;
+use base64::{engine::general_purpose, Engine as _};
 use macaroon::{ByteString, Caveat, Format, Macaroon, MacaroonKey, Verifier};
 
 fn bytes_to_hex(bytes: &[u8]) -> String {
@@ -32,7 +32,7 @@ fn creating_macaroons() {
 
     let b64_standard = "MDAxY2xvY2F0aW9uIGh0dHA6Ly9teWJhbmsvCjAwMjZpZGVudGlmaWVyIHdlIHVzZWQgb3VyIHNlY3JldCBrZXkKMDAyZnNpZ25hdHVyZSDj2eApCFJsTAA5rhURQRXZf91ovyujebNCqvD2F9BVLwo";
     let b64_url_safe =
-        base64::encode_config(base64::decode(b64_standard).unwrap(), base64::URL_SAFE);
+        general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD_NO_PAD.decode(b64_standard).unwrap());
     assert_eq!(mac.serialize(Format::V1).unwrap(), b64_url_safe);
 }
 
