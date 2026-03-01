@@ -12,12 +12,18 @@ categories = ["authentication", "cryptography"]
 license = "MIT"
 
 [dependencies]
+# Crypto - replace sodiumoxide dengan pure Rust
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+chacha20poly1305 = "0.10"
+
+# Updated dependencies
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+env_logger = "0.11"
 log = "0.4"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-sodiumoxide = "0.2"
-base64 = "0.13"
 
 [dev-dependencies]
-env_logger = "0.9"
 time = { version = "0.3", features = ["parsing"] }

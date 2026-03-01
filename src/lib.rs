@@ -104,7 +104,8 @@ extern crate log;
 extern crate base64;
 extern crate serde;
 extern crate serde_json;
-extern crate sodiumoxide;
+
+use base64::{engine::general_purpose, Engine as _};
 
 mod caveat;
 mod crypto;
@@ -128,7 +129,8 @@ pub type Result<T> = std::result::Result<T, MacaroonError>;
 /// calling this, the underlying random-number generator is not guaranteed to be thread-safe
 /// if you don't.
 pub fn initialize() -> Result<()> {
-    sodiumoxide::init().map_err(|_| MacaroonError::InitializationError)
+    // No-op: pure-Rust crypto doesn't need initialization
+    Ok(())
 }
 
 // An implementation that represents any binary data. By spec, most fields in a
@@ -181,7 +183,7 @@ impl From<MacaroonKey> for ByteString {
 
 impl fmt::Display for ByteString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", base64::encode(&self.0))
+        write!(f, "{}", general_purpose::STANDARD.encode(&self.0))
     }
 }
 
@@ -207,7 +209,7 @@ impl<'de> Visitor<'de> for ByteStringVisitor {
     where
         E: serde::de::Error,
     {
-        let raw = match base64::decode(value) {
+        let raw = match general_purpose::STANDARD.decode(value) {
             Ok(v) => v,
             Err(_) => return Err(E::custom("unable to base64 decode value")),
         };
@@ -237,9 +239,9 @@ fn base64_decode_flexible(b: &[u8]) -> Result<Vec<u8>> {
         ));
     }
     if b.contains(&b'_') || b.contains(&b'-') {
-        Ok(base64::decode_config(b, base64::URL_SAFE)?)
+        Ok(general_purpose::URL_SAFE.decode(b)?)
     } else {
-        Ok(base64::decode_config(b, base64::STANDARD)?)
+        Ok(general_purpose::STANDARD.decode(b)?)
     }
 }
 

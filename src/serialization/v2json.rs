@@ -3,6 +3,7 @@ use crate::caveat::CaveatBuilder;
 use crate::error::MacaroonError;
 use crate::serialization::macaroon_builder::MacaroonBuilder;
 use crate::{ByteString, Macaroon, Result};
+use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::str;
@@ -39,10 +40,7 @@ impl Serialization {
             l64: None,
             c: Vec::new(),
             s: None,
-            s64: Some(base64::encode_config(
-                &macaroon.signature(),
-                base64::URL_SAFE,
-            )),
+            s64: Some(general_purpose::URL_SAFE_NO_PAD.encode(AsRef::<[u8]>::as_ref(&macaroon.signature()))),
         };
         for c in macaroon.caveats() {
             match c {
@@ -111,9 +109,8 @@ impl Macaroon {
             Some(loc) => builder.set_location(&loc),
             None => {
                 if let Some(loc) = ser.l64 {
-                    builder.set_location(&String::from_utf8(base64::decode_config(
+                    builder.set_location(&String::from_utf8(general_purpose::URL_SAFE_NO_PAD.decode(
                         &loc,
-                        base64::URL_SAFE,
                     )?)?)
                 }
             }
@@ -122,7 +119,7 @@ impl Macaroon {
         let raw_sig = match ser.s {
             Some(sig) => sig,
             None => match ser.s64 {
-                Some(sig) => base64::decode_config(&sig, base64::URL_SAFE)?,
+                Some(sig) => general_purpose::URL_SAFE_NO_PAD.decode(&sig)?,
                 None => {
                     return Err(MacaroonError::DeserializationError(
                         "No signature found".into(),
@@ -156,9 +153,8 @@ impl Macaroon {
                 Some(loc) => caveat_builder.add_location(loc),
                 None => {
                     if let Some(loc64) = c.l64 {
-                        caveat_builder.add_location(String::from_utf8(base64::decode_config(
+                        caveat_builder.add_location(String::from_utf8(general_purpose::URL_SAFE_NO_PAD.decode(
                             &loc64,
-                            base64::URL_SAFE,
                         )?)?)
                     }
                 }

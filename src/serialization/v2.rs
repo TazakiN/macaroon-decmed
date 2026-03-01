@@ -2,6 +2,7 @@ use crate::caveat::{Caveat, CaveatBuilder};
 use crate::error::MacaroonError;
 use crate::serialization::macaroon_builder::MacaroonBuilder;
 use crate::{ByteString, Macaroon, Result};
+use base64::{engine::general_purpose, Engine as _};
 
 // Version 2 fields
 const EOS: u8 = 0;
@@ -53,13 +54,13 @@ pub fn serialize_binary(macaroon: &Macaroon) -> Result<Vec<u8>> {
         }
     }
     buffer.push(EOS);
-    serialize_field(SIGNATURE, &macaroon.signature(), &mut buffer);
+    serialize_field(SIGNATURE, macaroon.signature().as_ref(), &mut buffer);
     Ok(buffer)
 }
 
 pub fn serialize(macaroon: &Macaroon) -> Result<String> {
     let buf = serialize_binary(macaroon)?;
-    Ok(base64::encode_config(&buf, base64::URL_SAFE))
+    Ok(general_purpose::URL_SAFE_NO_PAD.encode(&buf))
 }
 
 struct Deserializer<'r> {
@@ -68,7 +69,7 @@ struct Deserializer<'r> {
 }
 
 impl<'r> Deserializer<'r> {
-    pub fn new(data: &[u8]) -> Deserializer {
+    pub fn new(data: &[u8]) -> Deserializer<'_> {
         Deserializer { data, index: 0 }
     }
 
@@ -253,7 +254,7 @@ mod tests {
             75, 233, 103, 205, 30, 160, 198, 178, 107, 175, 106, 74, 148, 238, 155, 5, 177, 88,
             134, 218, 11, 168, 94, 140, 66, 169, 60, 141, 14, 18, 94, 252,
         ];
-        let serialized: Vec<u8> = base64::decode_config(SERIALIZED, base64::URL_SAFE).unwrap();
+        let serialized: Vec<u8> = general_purpose::URL_SAFE_NO_PAD.decode(SERIALIZED).unwrap();
         let macaroon = super::deserialize(&serialized).unwrap();
         assert_eq!("http://example.org/", &macaroon.location().unwrap());
         assert_eq!(ByteString::from("keyid"), macaroon.identifier());
