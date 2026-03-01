@@ -31,8 +31,11 @@ fn creating_macaroons() {
     );
 
     let b64_standard = "MDAxY2xvY2F0aW9uIGh0dHA6Ly9teWJhbmsvCjAwMjZpZGVudGlmaWVyIHdlIHVzZWQgb3VyIHNlY3JldCBrZXkKMDAyZnNpZ25hdHVyZSDj2eApCFJsTAA5rhURQRXZf91ovyujebNCqvD2F9BVLwo";
-    let b64_url_safe =
-        general_purpose::URL_SAFE_NO_PAD.encode(general_purpose::STANDARD_NO_PAD.decode(b64_standard).unwrap());
+    let b64_url_safe = general_purpose::URL_SAFE_NO_PAD.encode(
+        general_purpose::STANDARD_NO_PAD
+            .decode(b64_standard)
+            .unwrap(),
+    );
     assert_eq!(mac.serialize(Format::V1).unwrap(), b64_url_safe);
 }
 

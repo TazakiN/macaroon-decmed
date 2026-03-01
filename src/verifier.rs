@@ -3,8 +3,31 @@ use crate::{ByteString, Caveat, Macaroon, MacaroonError, MacaroonKey, Result};
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 
+/// A function that evaluates a caveat predicate and returns `true` if
+/// the predicate is satisfied. Used with [`Verifier::satisfy_general`].
 pub type VerifyFunc = fn(&ByteString) -> bool;
 
+/// Verifies that a macaroon and its caveats are authentic and authorised.
+///
+/// The verifier holds a set of *exact* satisfiers (string predicates that
+/// must match byte-for-byte) and *general* satisfiers (functions that can
+/// interpret predicates). During verification it recomputes the HMAC
+/// chain and checks every caveat against the configured satisfiers.
+///
+/// # Example (DecMed access control)
+///
+/// ```rust
+/// use macaroon::{Macaroon, MacaroonKey, Verifier};
+/// macaroon::initialize().unwrap();
+///
+/// let key = MacaroonKey::generate(b"root-key");
+/// let mut mac = Macaroon::create(None, &key, "token".into()).unwrap();
+/// mac.add_first_party_caveat("patient_id = P-001".into());
+///
+/// let mut ver = Verifier::default();
+/// ver.satisfy_exact("patient_id = P-001".into());
+/// assert!(ver.verify(&mac, &key, vec![]).is_ok());
+/// ```
 #[derive(Default)]
 pub struct Verifier {
     exact: BTreeSet<ByteString>,
@@ -12,6 +35,17 @@ pub struct Verifier {
 }
 
 impl Verifier {
+    /// Verifies the macaroon's signature and all caveats.
+    ///
+    /// # Arguments
+    ///
+    /// * `m`          — The macaroon to verify.
+    /// * `key`        — The root key that was used to create the macaroon.
+    /// * `discharges` — Discharge macaroons for third-party caveats.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error variant from [`MacaroonError`] if verification fails.
     pub fn verify(&self, m: &Macaroon, key: &MacaroonKey, discharges: Vec<Macaroon>) -> Result<()> {
         let mut discharge_set = discharges
             .iter()
@@ -72,10 +106,18 @@ impl Verifier {
         Ok(())
     }
 
+    /// Adds an exact predicate to the satisfier set.
+    ///
+    /// During verification, a first-party caveat whose predicate is an
+    /// exact byte-for-byte match will be considered satisfied.
     pub fn satisfy_exact(&mut self, b: ByteString) {
         self.exact.insert(b);
     }
 
+    /// Registers a general satisfier function.
+    ///
+    /// During verification, if no exact match is found, each registered
+    /// function is called with the predicate until one returns `true`.
     pub fn satisfy_general(&mut self, f: VerifyFunc) {
         self.general.push(f)
     }

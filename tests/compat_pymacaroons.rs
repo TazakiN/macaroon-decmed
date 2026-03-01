@@ -68,7 +68,9 @@ fn test_serializing() {
 #[test]
 fn test_serializing_binary_id() {
     let root_key = MacaroonKey::generate(b"this is our super secret key; only we should know it");
-    let identifier = general_purpose::STANDARD_NO_PAD.decode("AK2o+q0Aq9+bONkXw7ky7HAuhCLO9hhaMMc").unwrap();
+    let identifier = general_purpose::STANDARD_NO_PAD
+        .decode("AK2o+q0Aq9+bONkXw7ky7HAuhCLO9hhaMMc")
+        .unwrap();
     let mut mac = Macaroon::create(
         Some("http://mybank/".into()),
         &root_key,

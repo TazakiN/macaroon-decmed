@@ -59,7 +59,10 @@ pub fn serialize_binary(macaroon: &Macaroon) -> Result<Vec<u8>> {
             }
         }
     }
-    serialized.extend(serialize_as_packet(SIGNATURE, macaroon.signature().as_ref()));
+    serialized.extend(serialize_as_packet(
+        SIGNATURE,
+        macaroon.signature().as_ref(),
+    ));
     Ok(serialized)
 }
 
@@ -273,24 +276,19 @@ mod tests {
 
         // these failed fuzz testing for this deserializer (V1)
         assert!(Macaroon::deserialize(&vec![70, 70, 102, 70]).is_err());
-        let tok = general_purpose::URL_SAFE_NO_PAD.encode(
-            &[97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 10],
-        );
+        let tok =
+            general_purpose::URL_SAFE_NO_PAD.encode(&[97, 97, 97, 97, 97, 97, 97, 97, 97, 97, 10]);
         assert!(Macaroon::deserialize(&tok.as_bytes()).is_err());
-        let tok = general_purpose::URL_SAFE_NO_PAD.encode(
-            &[
-                48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
-                48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
-                48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
-                48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 44, 125, 59, 64,
-            ],
-        );
+        let tok = general_purpose::URL_SAFE_NO_PAD.encode(&[
+            48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
+            48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
+            48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
+            48, 48, 48, 48, 48, 48, 48, 44, 125, 59, 64,
+        ]);
         assert!(Macaroon::deserialize(&tok.as_bytes()).is_err());
-        let tok = general_purpose::URL_SAFE_NO_PAD.encode(
-            &[
-                48, 48, 49, 48, 49, 48, 52, 48, 48, 48, 48, 48, 48, 48, 48, 32, 126, 10,
-            ],
-        );
+        let tok = general_purpose::URL_SAFE_NO_PAD.encode(&[
+            48, 48, 49, 48, 49, 48, 52, 48, 48, 48, 48, 48, 48, 48, 48, 32, 126, 10,
+        ]);
         assert!(Macaroon::deserialize(&tok.as_bytes()).is_err());
     }
 }

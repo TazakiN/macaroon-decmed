@@ -40,7 +40,10 @@ impl Serialization {
             l64: None,
             c: Vec::new(),
             s: None,
-            s64: Some(general_purpose::URL_SAFE_NO_PAD.encode(AsRef::<[u8]>::as_ref(&macaroon.signature()))),
+            s64: Some(
+                general_purpose::URL_SAFE_NO_PAD
+                    .encode(AsRef::<[u8]>::as_ref(&macaroon.signature())),
+            ),
         };
         for c in macaroon.caveats() {
             match c {
@@ -109,9 +112,9 @@ impl Macaroon {
             Some(loc) => builder.set_location(&loc),
             None => {
                 if let Some(loc) = ser.l64 {
-                    builder.set_location(&String::from_utf8(general_purpose::URL_SAFE_NO_PAD.decode(
-                        &loc,
-                    )?)?)
+                    builder.set_location(&String::from_utf8(
+                        general_purpose::URL_SAFE_NO_PAD.decode(&loc)?,
+                    )?)
                 }
             }
         };
@@ -153,9 +156,9 @@ impl Macaroon {
                 Some(loc) => caveat_builder.add_location(loc),
                 None => {
                     if let Some(loc64) = c.l64 {
-                        caveat_builder.add_location(String::from_utf8(general_purpose::URL_SAFE_NO_PAD.decode(
-                            &loc64,
-                        )?)?)
+                        caveat_builder.add_location(String::from_utf8(
+                            general_purpose::URL_SAFE_NO_PAD.decode(&loc64)?,
+                        )?)
                     }
                 }
             };

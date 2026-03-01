@@ -105,7 +105,11 @@ extern crate base64;
 extern crate serde;
 extern crate serde_json;
 
-use base64::{engine::{general_purpose, GeneralPurpose, GeneralPurposeConfig, DecodePaddingMode}, alphabet, Engine as _};
+use base64::{
+    alphabet,
+    engine::{general_purpose, DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig},
+    Engine as _,
+};
 
 mod caveat;
 mod crypto;
@@ -238,8 +242,8 @@ fn base64_decode_flexible(b: &[u8]) -> Result<Vec<u8>> {
             "empty token to deserialize".to_string(),
         ));
     }
-    let indifferent = GeneralPurposeConfig::new()
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent);
+    let indifferent =
+        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent);
     if b.contains(&b'_') || b.contains(&b'-') {
         let engine = GeneralPurpose::new(&alphabet::URL_SAFE, indifferent);
         Ok(engine.decode(b)?)
@@ -311,6 +315,7 @@ impl Macaroon {
         self.signature
     }
 
+    /// Returns a clone of all caveats (both first-party and third-party).
     pub fn caveats(&self) -> Vec<Caveat> {
         self.caveats.clone()
     }
@@ -349,12 +354,15 @@ impl Macaroon {
         Ok(self)
     }
 
-    /// Add a first-party caveat to the macaroon
+    /// Adds a first-party caveat to the macaroon.
     ///
-    /// A first-party caveat is just a string predicate in some
-    /// DSL which can be verified either by exact string match,
-    /// or by using a function to parse the string and validate it
-    /// (see Verifier for more info).
+    /// A first-party caveat is a predicate string that is verified locally,
+    /// either via exact string match or a user-supplied function.
+    ///
+    /// # Arguments
+    ///
+    /// * `predicate` — The caveat predicate, e.g. `"account = 12345"` or
+    ///   `"category = lab_results"`.
     pub fn add_first_party_caveat(&mut self, predicate: ByteString) {
         let caveat: caveat::Caveat = caveat::new_first_party(predicate);
         self.signature = caveat.sign(&self.signature);
@@ -362,12 +370,22 @@ impl Macaroon {
         debug!("Macaroon::add_first_party_caveat: {:?}", self);
     }
 
-    /// Add a third-party caveat to the macaroon
+    /// Adds a third-party caveat to the macaroon.
     ///
-    /// A third-party caveat is a caveat which must be verified by a third party
-    /// using macaroons provided by them (referred to as "discharge macaroons").
+    /// A third-party caveat delegates part of the authorisation decision to
+    /// an external service at `location`. The `key` is encrypted into the
+    /// macaroon as the "verifier ID", and the third party uses it to create
+    /// a discharge macaroon.
+    ///
+    /// # Arguments
+    ///
+    /// * `location` — URL or identifier of the third-party service.
+    /// * `key`      — The shared key between the macaroon issuer and the
+    ///   third party.
+    /// * `id`       — A caveat identifier meaningful to the third party.
     pub fn add_third_party_caveat(&mut self, location: &str, key: &MacaroonKey, id: ByteString) {
-        let vid: Vec<u8> = crypto::encrypt_key(&self.signature, key);
+        let vid: Vec<u8> = crypto::encrypt_key(&self.signature, key)
+            .expect("encryption with a valid 32-byte key should never fail");
         let caveat: caveat::Caveat = caveat::new_third_party(id, ByteString(vid), location);
         self.signature = caveat.sign(&self.signature);
         self.caveats.push(caveat);
@@ -390,10 +408,14 @@ impl Macaroon {
         );
     }
 
-    /// Serialize the macaroon using the serialization [Format] provided
+    /// Serializes the macaroon using the specified [`Format`].
     ///
-    /// For V1 and V2, the binary format will be encoded as URL-safe base64 with padding
-    /// (`base64::URL_SAFE`). For V2JSON, the output will be JSON.
+    /// For `V1` and `V2`, the binary format is encoded as URL-safe base64
+    /// (no padding). For `V2JSON`, the output is a JSON string.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `MacaroonError` if serialization fails.
     pub fn serialize(&self, format: serialization::Format) -> Result<String> {
         match format {
             serialization::Format::V1 => serialization::v1::serialize(self),
@@ -467,6 +489,7 @@ impl Macaroon {
 
 #[cfg(test)]
 mod tests {
+    use crate::serialization::Format;
     use crate::{ByteString, Caveat, Macaroon, MacaroonError, MacaroonKey, Result, Verifier};
 
     #[test]
@@ -605,6 +628,81 @@ mod tests {
         assert!(Macaroon::deserialize(&vec![10]).is_err());
         assert!(Macaroon::deserialize(&vec![70, 70, 102, 70]).is_err());
         assert!(Macaroon::deserialize(&vec![2, 2, 212, 212, 212, 212]).is_err());
+    }
+
+    /// Serialize with one format, deserialize, re-serialize with another,
+    /// and confirm equality across all three formats.
+    #[test]
+    fn test_cross_format_roundtrip() {
+        let key = MacaroonKey::generate(b"cross-format key");
+        let mut mac = Macaroon::create(
+            Some("http://example.org/".into()),
+            &key,
+            "cross-format-id".into(),
+        )
+        .unwrap();
+        mac.add_first_party_caveat("account = 42".into());
+        mac.add_first_party_caveat("role = doctor".into());
+        mac.add_third_party_caveat(
+            "https://auth.decmed.io",
+            &MacaroonKey::generate(b"tp-key"),
+            "tp-caveat".into(),
+        );
+
+        // V1 -> V2 -> V2JSON -> V1 and verify all are equal
+        let s_v1 = mac.serialize(Format::V1).unwrap();
+        let d_v1 = Macaroon::deserialize(&s_v1).unwrap();
+        assert_eq!(mac, d_v1);
+
+        let s_v2 = d_v1.serialize(Format::V2).unwrap();
+        let d_v2 = Macaroon::deserialize(&s_v2).unwrap();
+        assert_eq!(mac, d_v2);
+
+        let s_v2j = d_v2.serialize(Format::V2JSON).unwrap();
+        let d_v2j = Macaroon::deserialize(&s_v2j).unwrap();
+        assert_eq!(mac, d_v2j);
+
+        // Full circle back to V1
+        let s_v1_again = d_v2j.serialize(Format::V1).unwrap();
+        assert_eq!(s_v1, s_v1_again);
+    }
+
+    /// End-to-end: create macaroon with multiple caveats, serialize,
+    /// deserialize, and verify.
+    #[test]
+    fn test_end_to_end_create_serialize_verify() {
+        let key = MacaroonKey::generate(b"e2e-root-key");
+        let mut mac = Macaroon::create(
+            Some("http://emr.decmed.io/".into()),
+            &key,
+            "record-access-token".into(),
+        )
+        .unwrap();
+        mac.add_first_party_caveat("patient_id = P-12345".into());
+        mac.add_first_party_caveat("category = lab_results".into());
+        mac.add_first_party_caveat("action = read".into());
+
+        // Serialize and deserialize via V2
+        let token = mac.serialize(Format::V2).unwrap();
+        let restored = Macaroon::deserialize(&token).unwrap();
+        assert_eq!(mac, restored);
+
+        // Verify with correct satisfiers
+        let mut ver = Verifier::default();
+        ver.satisfy_exact("patient_id = P-12345".into());
+        ver.satisfy_exact("category = lab_results".into());
+        ver.satisfy_exact("action = read".into());
+        assert!(ver.verify(&restored, &key, Default::default()).is_ok());
+
+        // Verify fails with missing satisfier
+        let ver_incomplete = Verifier::default();
+        assert!(ver_incomplete
+            .verify(&restored, &key, Default::default())
+            .is_err());
+
+        // Verify fails with wrong key
+        let wrong = MacaroonKey::generate(b"wrong-key");
+        assert!(ver.verify(&restored, &wrong, Default::default()).is_err());
     }
 }
 
